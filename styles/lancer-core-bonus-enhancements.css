@@ -14,7 +14,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 1px 6px;
+  padding: 1px 4px 1px 6px;
   font-size: 11px;
   line-height: 1.6;
   border: 1px solid var(--color-border-dark-5, #999);
@@ -33,19 +33,29 @@
   color: #b03a2e;
 }
 
-.lcbe-remove {
+.lcbe-tag .lcbe-remove {
   cursor: pointer;
-  font-size: 10px;
+  display: inline-block !important;
+  padding: 0 4px;
+  margin-left: 2px;
+  font-size: 14px !important;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 3px;
   opacity: 0.6;
 }
-.lcbe-remove:hover {
+.lcbe-tag .lcbe-remove:hover {
   opacity: 1;
-  color: #b03a2e;
+  color: #fff;
+  background: #b03a2e;
+}
+.lcbe-tag .lcbe-remove:focus-visible {
+  outline: 2px solid #b03a2e;
+  outline-offset: 1px;
 }
 
-.lcbe-add {
-  font-size: 11px;
-  height: 20px;
-  max-width: 14rem;
-  padding: 0 4px;
+/* highlight a mount card while a draggable is over it */
+.mount.card.lcbe-drop-ok {
+  outline: 2px dashed var(--color-shadow-primary, #ff6400);
+  outline-offset: -2px;
 }

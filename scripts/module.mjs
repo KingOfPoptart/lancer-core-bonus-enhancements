@@ -13,17 +13,17 @@
  *
  * How it works, without touching the system:
  *   - Pins live in an actor flag, keyed by a mount signature.
- *   - The mech sheet is decorated on `renderLancerMechSheet`: a row under each
- *     mount header showing pinned bonuses + (when editable) a picker of the
- *     piloting pilot's eligible core bonuses.
+ *   - To pin one, drag the core bonus item (e.g. from a compendium) onto the
+ *     weapon mount on the mech sheet. On a Comp/Con JSON import the pins are
+ *     restored automatically from each mount's `bonus_effects`.
+ *   - The mech sheet shows a small tag under a mount header for each pinned
+ *     bonus, with an x to remove it.
  *   - Accuracy is injected by a custom WeaponAttackFlow step (registered through
- *     the system's `lancer.registerFlows` hook) inserted after `initAttackData`
- *     and before `showAttackHUD`, so it pre-fills the Acc/Diff HUD and stays
- *     editable.
+ *     `lancer.registerFlows`) inserted after `initAttackData`; it pre-fills the
+ *     Acc/Diff HUD and stays editable.
  *   - Overpower Caliber is a custom DamageRollFlow step inserted after
- *     `initDamageData`: if eligible and unused this round it asks whether to add
- *     +1d6 bonus damage, and on "yes" pushes it into the damage HUD and records
- *     the 1/round use against the current combat round.
+ *     `initDamageData`: on a hit, if eligible and unused this combat round, it
+ *     asks whether to add +1d6 bonus damage and records the 1/round use.
  */
 
 const MODULE_ID = "lancer-core-bonus-enhancements";
@@ -54,6 +54,9 @@ const MOUNT_CORE_BONUSES = {
 
 const isMountCoreBonus = lid => Object.prototype.hasOwnProperty.call(MOUNT_CORE_BONUSES, lid);
 
+/** Pull a LID out of a Comp/Con `bonus_effects` entry (string or {id: "..."}). */
+const bonusEffectLid = be => (typeof be === "string" ? be : be?.id ?? be?.lid ?? null);
+
 /* -------------------------------------------------------------------------- */
 /*  Storage — an actor flag: { mounts: { <signature>: [lid, ...] } }          */
 /* -------------------------------------------------------------------------- */
@@ -65,8 +68,7 @@ const isMountCoreBonus = lid => Object.prototype.hasOwnProperty.call(MOUNT_CORE_
  * mounts (e.g. two Main mounts) would otherwise be indistinguishable and a pin
  * on one would leak onto the other. The trade-off: reordering or inserting a
  * mount ahead of a pinned one drops the pin, and it must be re-pinned. Changing
- * a mount's type or fittings also drops its pins, which is intended (the bonus
- * was chosen for that mount as it was configured).
+ * a mount's type or fittings also drops its pins, which is intended.
  */
 function mountSignature(mount, index) {
   const sizes = (mount?.slots ?? []).map(s => s?.size ?? "?").join(",");
@@ -89,7 +91,13 @@ async function setPins(mech, mount, index, lids) {
   const clean = [...new Set(lids.filter(isMountCoreBonus))];
   if (clean.length) all[sig] = clean;
   else delete all[sig];
-  await mech.setFlag(MODULE_ID, "mounts", all);
+
+  // setFlag merges recursively, so it can't remove a key. Clear the whole map,
+  // then write the fresh one back if anything is left.
+  await mech.unsetFlag(MODULE_ID, "mounts");
+  if (Object.keys(all).length) {
+    await mech.setFlag(MODULE_ID, "mounts", all);
+  }
 }
 
 /** The mount (and its index) holding a given equipped mech weapon, or null. */
@@ -133,7 +141,7 @@ function coreBonusLabel(mech, lid) {
 /* -------------------------------------------------------------------------- */
 
 /**
- * "1/round" is a combat concept. In combat, the use is recorded against the
+ * "1/round" is a combat concept. In combat the use is recorded against the
  * current combat id + round number and frees up when the round advances. Out of
  * combat there is no round, so no limit is enforced.
  */
@@ -171,84 +179,220 @@ async function confirmDialog(title, content) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Sheet decoration                                                          */
+/*  Sheet decoration — tags + drag-drop to pin                               */
 /* -------------------------------------------------------------------------- */
+
+async function onCoreBonusDrop(ev, mech, index) {
+  let data;
+  try {
+    data = JSON.parse(ev.dataTransfer?.getData("text/plain") || "");
+  } catch {
+    return;
+  }
+  if (data?.type !== "Item" || !data.uuid) return;
+
+  let item;
+  try {
+    item = await fromUuid(data.uuid);
+  } catch {
+    return;
+  }
+  const lid = item?.system?.lid;
+  if (item?.type !== "core_bonus") return;
+
+  // It's a core bonus drop — claim the event so the sheet doesn't also handle it.
+  ev.preventDefault();
+  ev.stopPropagation();
+
+  if (!isMountCoreBonus(lid)) {
+    ui.notifications?.warn(
+      game.i18n.format(`${MODULE_ID}.drop.unsupported`, { name: item.name })
+    );
+    return;
+  }
+
+  const mount = mech.system?.loadout?.weapon_mounts?.[index];
+  if (!mount) return;
+  const pins = getPins(mech, mount, index);
+  if (pins.includes(lid)) {
+    ui.notifications?.info(game.i18n.format(`${MODULE_ID}.drop.already`, { name: item.name }));
+    return;
+  }
+  await setPins(mech, mount, index, [...pins, lid]);
+  ui.notifications?.info(
+    game.i18n.format(`${MODULE_ID}.drop.pinned`, { name: item.name, mount: mount.type })
+  );
+  if (!pilotMountCoreBonusLids(mech).has(lid)) {
+    ui.notifications?.warn(game.i18n.localize(`${MODULE_ID}.orphanWarning`));
+  }
+}
+
+function decorateMountCard(card, mech, editable) {
+  const header = card.querySelector(".mount-type-ctx-root");
+  const idxMatch = /weapon_mounts\.(\d+)/.exec(header?.dataset?.path ?? "");
+  if (!header || !idxMatch) return;
+
+  const index = Number(idxMatch[1]);
+  const mount = mech.system?.loadout?.weapon_mounts?.[index];
+  if (!mount || mount.bracing) return;
+
+  // Drop-to-pin: register once per card element.
+  if (editable && card.dataset.lcbeDnd !== "1") {
+    card.dataset.lcbeDnd = "1";
+    card.addEventListener("dragover", ev => {
+      if (ev.dataTransfer?.types?.includes("text/plain")) {
+        ev.preventDefault();
+        card.classList.add("lcbe-drop-ok");
+      }
+    });
+    card.addEventListener("dragleave", () => card.classList.remove("lcbe-drop-ok"));
+    card.addEventListener("drop", ev => {
+      card.classList.remove("lcbe-drop-ok");
+      onCoreBonusDrop(ev, mech, index);
+    });
+  }
+
+  card.querySelector(".lcbe-row")?.remove(); // rebuilt each render
+
+  const pins = getPins(mech, mount, index);
+  if (!pins.length) return;
+
+  const owned = pilotMountCoreBonusLids(mech);
+  const row = document.createElement("div");
+  row.className = "lcbe-row";
+
+  for (const lid of pins) {
+    const tag = document.createElement("span");
+    tag.className = "lcbe-tag";
+    const orphaned = !owned.has(lid);
+    if (orphaned) tag.classList.add("lcbe-tag--orphan");
+    tag.title = orphaned
+      ? game.i18n.localize(`${MODULE_ID}.orphanWarning`)
+      : MOUNT_CORE_BONUSES[lid]?.effect ?? "";
+
+    const icon = document.createElement("i");
+    icon.className = "cci cci-corebonus";
+    tag.append(icon, document.createTextNode(" " + coreBonusLabel(mech, lid)));
+
+    if (editable) {
+      const remove = document.createElement("span");
+      remove.className = "lcbe-remove";
+      remove.textContent = "×"; // ×
+      remove.title = game.i18n.localize(`${MODULE_ID}.detach`);
+      remove.setAttribute("role", "button");
+      remove.setAttribute("tabindex", "0");
+      remove.setAttribute("aria-label", game.i18n.localize(`${MODULE_ID}.detach`));
+      const doRemove = ev => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const live = mech.system.loadout.weapon_mounts[index];
+        if (!live) return;
+        setPins(mech, live, index, getPins(mech, live, index).filter(l => l !== lid));
+      };
+      remove.addEventListener("click", doRemove);
+      remove.addEventListener("keydown", ev => {
+        if (ev.key === "Enter" || ev.key === " ") doRemove(ev);
+      });
+      tag.append(remove);
+    }
+    row.append(tag);
+  }
+
+  header.after(row);
+}
 
 function onRenderMechSheet(app, html) {
   try {
     const mech = app?.actor;
     if (!mech || mech.type !== "mech") return;
-
     const root = html?.[0] ?? html;
     if (!(root instanceof HTMLElement)) return;
-
     const editable = !!app.isEditable;
-    const mounts = mech.system?.loadout?.weapon_mounts ?? [];
-
-    root.querySelectorAll(".mount.card").forEach(card => {
-      const header = card.querySelector(".mount-type-ctx-root");
-      const idxMatch = /weapon_mounts\.(\d+)/.exec(header?.dataset?.path ?? "");
-      if (!header || !idxMatch) return;
-
-      const index = Number(idxMatch[1]);
-      const mount = mounts[index];
-      if (!mount || mount.bracing) return;
-
-      card.querySelector(".lcbe-row")?.remove(); // avoid stacking on re-render
-
-      const pins = getPins(mech, mount, index);
-      const owned = pilotMountCoreBonusLids(mech);
-      const pickable = [...owned].filter(lid => !pins.includes(lid));
-
-      if (!pins.length && !(editable && pickable.length)) return;
-
-      const row = document.createElement("div");
-      row.className = "lcbe-row";
-
-      for (const lid of pins) {
-        const tag = document.createElement("span");
-        tag.className = "lcbe-tag";
-        const orphaned = !owned.has(lid);
-        if (orphaned) tag.classList.add("lcbe-tag--orphan");
-        tag.title = orphaned
-          ? game.i18n.localize(`${MODULE_ID}.orphanWarning`)
-          : MOUNT_CORE_BONUSES[lid]?.effect ?? "";
-
-        const icon = document.createElement("i");
-        icon.className = "cci cci-corebonus";
-        tag.append(icon, document.createTextNode(" " + coreBonusLabel(mech, lid)));
-
-        if (editable) {
-          const remove = document.createElement("a");
-          remove.className = "lcbe-remove fas fa-times";
-          remove.setAttribute("role", "button");
-          remove.setAttribute("aria-label", game.i18n.localize(`${MODULE_ID}.detach`));
-          remove.addEventListener("click", ev => {
-            ev.preventDefault();
-            ev.stopPropagation();
-            setPins(mech, mount, index, pins.filter(l => l !== lid));
-          });
-          tag.append(remove);
-        }
-        row.append(tag);
-      }
-
-      if (editable && pickable.length) {
-        const select = document.createElement("select");
-        select.className = "lcbe-add";
-        select.append(new Option(game.i18n.localize(`${MODULE_ID}.addPlaceholder`), ""));
-        for (const lid of pickable) select.append(new Option(coreBonusLabel(mech, lid), lid));
-        select.addEventListener("change", () => {
-          if (select.value) setPins(mech, mount, index, [...pins, select.value]);
-        });
-        row.append(select);
-      }
-
-      header.after(row);
-    });
+    root.querySelectorAll(".mount.card").forEach(card => decorateMountCard(card, mech, editable));
   } catch (err) {
     console.error(`${MODULE_ID} | failed to decorate mech sheet`, err);
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Comp/Con import — restore pins from each mount's bonus_effects            */
+/* -------------------------------------------------------------------------- */
+
+async function applyImportedPins(rawPilotData) {
+  const data = rawPilotData?.data ?? rawPilotData; // unwrap CCv3 EXPORT wrapper
+  const ccMechs = data?.mechs;
+  if (!Array.isArray(ccMechs)) return;
+
+  let pinned = 0;
+  for (const ccMech of ccMechs) {
+    const mech = game.actors.find(a => a.type === "mech" && a.system?.lid === ccMech.id);
+    if (!mech) continue;
+
+    const loadout =
+      ccMech.loadouts?.[ccMech.active_loadout_index ?? 0] ?? ccMech.loadout ?? null;
+    if (!loadout) continue;
+
+    const ccMounts = [
+      ...(loadout.mounts ?? []),
+      loadout.improved_armament,
+      loadout.integratedWeapon,
+      loadout.superheavy_mounting,
+      ...(loadout.integratedMounts ?? []),
+      ...(loadout.extraMounts ?? []),
+    ].filter(Boolean);
+
+    for (const ccMount of ccMounts) {
+      const lids = (ccMount.bonus_effects ?? [])
+        .map(bonusEffectLid)
+        .filter(lid => lid && isMountCoreBonus(lid));
+      if (!lids.length) continue;
+
+      const weaponLids = [...(ccMount.slots ?? []), ...(ccMount.extra ?? [])]
+        .map(s => s?.weapon?.id)
+        .filter(Boolean);
+      if (!weaponLids.length) continue; // can't locate an empty mount reliably
+
+      const fMounts = mech.system.loadout.weapon_mounts;
+      const fi = fMounts.findIndex(m =>
+        (m.slots ?? []).some(s => weaponLids.includes(s.weapon?.value?.system?.lid))
+      );
+      if (fi < 0) continue;
+
+      const existing = getPins(mech, fMounts[fi], fi);
+      const merged = [...new Set([...existing, ...lids])];
+      if (merged.length !== existing.length) {
+        await setPins(mech, fMounts[fi], fi, merged);
+        pinned += merged.length - existing.length;
+      }
+    }
+  }
+
+  if (pinned) {
+    ui.notifications?.info(
+      game.i18n.format(`${MODULE_ID}.import.restored`, { count: pinned })
+    );
+  }
+}
+
+function installImportHook() {
+  const proto = game.lancer?.applications?.LancerPilotSheet?.prototype;
+  if (!proto || proto.__lcbePatched) return;
+  const original = proto._onPilotJsonParsed;
+  if (typeof original !== "function") {
+    console.warn(`${MODULE_ID} | LancerPilotSheet._onPilotJsonParsed not found — import auto-pin disabled`);
+    return;
+  }
+  proto._onPilotJsonParsed = async function (fileData) {
+    const result = await original.call(this, fileData);
+    try {
+      await applyImportedPins(JSON.parse(fileData));
+    } catch (err) {
+      console.error(`${MODULE_ID} | import pin sync failed`, err);
+    }
+    return result;
+  };
+  proto.__lcbePatched = true;
+  console.log(`${MODULE_ID} | patched LancerPilotSheet._onPilotJsonParsed for import auto-pin`);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -263,7 +407,6 @@ async function autostabAccuracyStep(state) {
     if (!mech || !weapon || !accDiff?.base) return true;
     if (!activeCoreBonusForWeapon(mech, weapon.id, AUTOSTAB_LID)) return true;
 
-    // Seed the Acc/Diff HUD; it stays editable, exactly like the Accurate tag.
     accDiff.base.accuracy += MOUNT_CORE_BONUSES[AUTOSTAB_LID].accuracy;
   } catch (err) {
     console.error(`${MODULE_ID} | Auto-Stab accuracy step failed`, err);
@@ -283,20 +426,19 @@ async function overpowerDamageStep(state) {
     if (!mech || !weapon || !data) return true;
     if (!activeCoreBonusForWeapon(mech, weapon.id, OVERPOWER_LID)) return true;
 
-    // "when you hit" — has_normal_hit is true when there are no target rolls too
     const hit = data.has_normal_hit || data.has_crit_hit;
     if (!hit) return true;
 
     if (overpowerUsedThisRound(mech)) {
-      ui.notifications?.info(
-        game.i18n.localize(`${MODULE_ID}.overpower.alreadyUsed`)
-      );
+      ui.notifications?.info(game.i18n.localize(`${MODULE_ID}.overpower.alreadyUsed`));
       return true;
     }
 
     const proceed = await confirmDialog(
       coreBonusLabel(mech, OVERPOWER_LID),
-      game.i18n.format(`${MODULE_ID}.overpower.prompt`, { dice: MOUNT_CORE_BONUSES[OVERPOWER_LID].bonusDamage })
+      game.i18n.format(`${MODULE_ID}.overpower.prompt`, {
+        dice: MOUNT_CORE_BONUSES[OVERPOWER_LID].bonusDamage,
+      })
     );
     if (!proceed) return true;
 
@@ -310,7 +452,9 @@ async function overpowerDamageStep(state) {
 
     await markOverpowerUsed(mech);
     ui.notifications?.info(
-      game.i18n.format(`${MODULE_ID}.overpower.applied`, { dice: MOUNT_CORE_BONUSES[OVERPOWER_LID].bonusDamage })
+      game.i18n.format(`${MODULE_ID}.overpower.applied`, {
+        dice: MOUNT_CORE_BONUSES[OVERPOWER_LID].bonusDamage,
+      })
     );
   } catch (err) {
     console.error(`${MODULE_ID} | Overpower Caliber step failed`, err);
@@ -349,19 +493,16 @@ function registerFlowSteps(flowSteps, flows) {
 /*  Wiring                                                                    */
 /* -------------------------------------------------------------------------- */
 
-Hooks.once("init", () => {
-  console.log(`${MODULE_ID} | init`);
-});
-
+Hooks.once("init", () => console.log(`${MODULE_ID} | init`));
 Hooks.once("lancer.registerFlows", registerFlowSteps);
 Hooks.on("renderLancerMechSheet", onRenderMechSheet);
 
 Hooks.once("ready", () => {
   if (game.system?.id !== "lancer") {
-    console.warn(
-      `${MODULE_ID} | active system is "${game.system?.id}", not "lancer" — module is inert`
-    );
+    console.warn(`${MODULE_ID} | active system is "${game.system?.id}", not "lancer" — module is inert`);
+    return;
   }
+  installImportHook();
 });
 
 // Exposed for debugging / other modules.
@@ -375,4 +516,5 @@ globalThis.lancerCoreBonusEnhancements = {
   pilotMountCoreBonusLids,
   activeCoreBonusForWeapon,
   overpowerUsedThisRound,
+  applyImportedPins,
 };
