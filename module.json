@@ -2,7 +2,7 @@
   "id": "lancer-core-bonus-enhancements",
   "title": "Lancer Core Bonus Enhancements",
   "description": "<p>Adds mechanical support for the mount- and weapon-scoped core bonuses in the <a href=\"https://foundryvtt.com/packages/lancer\">LANCER</a> system: pin <strong>Auto-Stabilizing Hardpoints</strong>, <strong>Overpower Caliber</strong> or <strong>Superheavy Mounting</strong> to a weapon mount straight from the mech sheet. Auto-Stabilizing Hardpoints feeds its <strong>+1 Accuracy</strong> into attack rolls with that mount's weapons; Overpower Caliber offers its <strong>+1d6 bonus damage</strong> once per round, on a hit, when you roll damage.</p><p>Implements the request in <a href=\"https://github.com/Eranziel/foundryvtt-lancer/issues/724\">foundryvtt-lancer#724</a> as a standalone module. No system changes, no world migration.</p>",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "compatibility": {
     "minimum": "13",
     "verified": "13"
@@ -41,7 +41,7 @@
   },
   "url": "https://github.com/KingOfPoptart/lancer-core-bonus-enhancements",
   "manifest": "https://github.com/KingOfPoptart/lancer-core-bonus-enhancements/releases/latest/download/module.json",
-  "download": "https://github.com/KingOfPoptart/lancer-core-bonus-enhancements/releases/download/v0.2.1/module.zip",
+  "download": "https://github.com/KingOfPoptart/lancer-core-bonus-enhancements/releases/download/v0.2.2/module.zip",
   "readme": "https://github.com/KingOfPoptart/lancer-core-bonus-enhancements/blob/main/README.md",
   "bugs": "https://github.com/KingOfPoptart/lancer-core-bonus-enhancements/issues",
   "changelog": "https://github.com/KingOfPoptart/lancer-core-bonus-enhancements/blob/main/CHANGELOG.md",

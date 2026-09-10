@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.2
+
+- **Fixed:** dragging a core bonus **from a compendium** still did nothing.
+  On Foundry v13 a compendium row carries `data-entry-id`, which the LANCER
+  system's global drag tracker doesn't recognise, so its whole sheet-drop
+  pipeline never fires for compendium drags. The module now also adds its own
+  capture-phase `dragover`/`drop` listeners on the mech sheet root: it
+  `preventDefault`s dragover over a mount card so a `drop` actually fires, then
+  reads the native drag payload itself. The pilot-sheet path (0.2.1) is kept for
+  owned items.
+
 ## 0.2.1
 
 - **Fixed:** dragging a core bonus onto a mount did nothing. The DIY drop

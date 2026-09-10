@@ -207,11 +207,9 @@ function mountIndexFromEvent(event) {
   return m ? Number(m[1]) : -1;
 }
 
-async function pinDroppedCoreBonus(mech, event, doc) {
-  const lid = doc.system.lid;
-  const index = mountIndexFromEvent(event);
-  const mount = index >= 0 ? mech.system?.loadout?.weapon_mounts?.[index] : null;
-
+async function doPinCoreBonus(mech, index, doc) {
+  const lid = doc?.system?.lid;
+  const mount = index >= 0 ? mech?.system?.loadout?.weapon_mounts?.[index] : null;
   if (!mount || mount.bracing) {
     ui.notifications?.warn(game.i18n.localize(`${MODULE_ID}.drop.needMount`));
     return;
@@ -230,10 +228,15 @@ async function pinDroppedCoreBonus(mech, event, doc) {
   }
 }
 
+async function pinDroppedCoreBonus(mech, event, doc) {
+  return doPinCoreBonus(mech, mountIndexFromEvent(event), doc);
+}
+
 /**
- * The system routes every sheet drop through `canRootDrop` (gates the dragover
- * preventDefault, so without this a core-bonus drop is inert) and `onRootDrop`.
- * We extend both on the mech sheet prototype.
+ * Path 1 — owned items / anything the system resolves into a `GlobalDragPreview`
+ * (e.g. dragging a core bonus off the pilot sheet). The system routes those
+ * through `canRootDrop` (which gates the dragover preventDefault) and
+ * `onRootDrop`; we extend both on the mech sheet prototype.
  */
 function installDropHook() {
   const proto = game.lancer?.applications?.LancerMechSheet?.prototype;
@@ -260,6 +263,87 @@ function installDropHook() {
 
   proto.__lcbeDropPatched = true;
   console.log(`${MODULE_ID} | patched LancerMechSheet drop handling for core bonuses`);
+}
+
+/**
+ * Path 2 — native drops the system never sees. On Foundry v13 a compendium row
+ * carries `data-entry-id` (not `data-documentId`), so the system's global
+ * drag-tracker never resolves it, `GlobalDragPreview` stays null, and its
+ * `handleDocDropping` never fires. We add our own capture-phase listeners on the
+ * sheet root: preventDefault on dragover so a `drop` actually fires, then on
+ * drop read the native `text/plain` payload ourselves.
+ */
+function installNativeDropListeners(rootEl, mech) {
+  if (!rootEl || rootEl.dataset.lcbeNativeDrop === "1") return;
+  rootEl.dataset.lcbeNativeDrop = "1";
+
+  const cardFrom = ev => ev.target?.closest?.(".mount.card");
+
+  rootEl.addEventListener(
+    "dragover",
+    ev => {
+      const card = cardFrom(ev);
+      if (!card || mech.type !== "mech") return;
+      const types = ev.dataTransfer ? Array.from(ev.dataTransfer.types) : [];
+      if (!types.includes("text/plain")) return;
+      ev.preventDefault(); // required or the browser never fires `drop`
+      if (document.body.classList.contains("dragging-core_bonus")) card.classList.add("lcbe-drop-ok");
+    },
+    true
+  );
+
+  rootEl.addEventListener(
+    "dragleave",
+    ev => cardFrom(ev)?.classList.remove("lcbe-drop-ok"),
+    true
+  );
+
+  rootEl.addEventListener(
+    "drop",
+    async ev => {
+      const card = cardFrom(ev);
+      if (!card || mech.type !== "mech") return;
+      card.classList.remove("lcbe-drop-ok");
+
+      let raw;
+      try {
+        raw = ev.dataTransfer?.getData("text/plain");
+      } catch {
+        return;
+      }
+      if (!raw) return;
+
+      let data;
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        return;
+      }
+      if (data?.type !== "Item" || !data.uuid) return;
+
+      let doc;
+      try {
+        doc = await fromUuid(data.uuid);
+      } catch {
+        return;
+      }
+      if (doc?.type !== "core_bonus" || !isMountCoreBonus(doc.system?.lid)) return;
+
+      // It's ours — take it over completely.
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+
+      const m = /weapon_mounts\.(\d+)/.exec(
+        card.querySelector(".mount-type-ctx-root")?.dataset?.path ?? ""
+      );
+      try {
+        await doPinCoreBonus(mech, m ? Number(m[1]) : -1, doc);
+      } catch (err) {
+        console.error(`${MODULE_ID} | native core bonus drop failed`, err);
+      }
+    },
+    true
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -338,6 +422,7 @@ function onRenderMechSheet(app, html) {
   try {
     const mech = app?.actor;
     if (!mech || mech.type !== "mech") return;
+    installNativeDropListeners(html?.[0] ?? html, mech);
     const root = html?.[0] ?? html;
     if (!(root instanceof HTMLElement)) return;
     const editable = !!app.isEditable;
