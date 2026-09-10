@@ -4,6 +4,7 @@
   "lancer-core-bonus-enhancements.drop.pinned": "Pinned {name} to the {mount} mount.",
   "lancer-core-bonus-enhancements.drop.already": "{name} is already pinned to that mount.",
   "lancer-core-bonus-enhancements.drop.unsupported": "{name} is not a mount core bonus this module automates.",
+  "lancer-core-bonus-enhancements.drop.needMount": "Drop the core bonus onto a weapon mount on the LOADOUT tab.",
   "lancer-core-bonus-enhancements.import.restored": "Lancer Core Bonus Enhancements: restored {count} pinned core bonus(es) from the import.",
   "lancer-core-bonus-enhancements.overpower.prompt": "Add +{dice} bonus damage from Overpower Caliber? This uses its 1/round.",
   "lancer-core-bonus-enhancements.overpower.applied": "Overpower Caliber: +{dice} bonus damage added.",

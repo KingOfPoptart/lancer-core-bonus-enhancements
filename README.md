@@ -40,9 +40,11 @@ the pilot has it (or you remove the pin).
   keyed by a mount signature (`type | fitting sizes | index`), matched strictly.
   Changing a mount's type/fittings, or reordering/inserting mounts ahead of a
   pinned one, drops the pin — re-pin from the sheet.
-- **Drag-drop.** `renderLancerMechSheet` attaches `dragover`/`drop` handlers to
-  each `.mount.card`; a dropped `core_bonus` item is pinned to that mount and the
-  event is consumed so the system's own drop handling doesn't also see it.
+- **Drag-drop.** `LancerMechSheet.prototype.canRootDrop` / `onRootDrop` are
+  extended: a `core_bonus` drop is accepted and pinned to the mount under the
+  cursor (`event.target.closest(".mount.card")`), and the system's own handler is
+  not called for it. Going through the system's drop pipeline is why it works
+  from the compendium, the pilot sheet and the sidebar alike.
 - **Import.** `LancerPilotSheet.prototype._onPilotJsonParsed` is wrapped so that,
   after the system's import finishes, each Comp/Con mech's mount `bonus_effects`
   are matched to the imported Foundry mount by the weapon it holds, and pinned.

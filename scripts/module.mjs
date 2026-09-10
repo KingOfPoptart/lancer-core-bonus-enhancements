@@ -179,53 +179,92 @@ async function confirmDialog(title, content) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Sheet decoration — tags + drag-drop to pin                               */
+/*  Drag-drop to pin — via the system's own canRootDrop / onRootDrop          */
 /* -------------------------------------------------------------------------- */
 
-async function onCoreBonusDrop(ev, mech, index) {
-  let data;
-  try {
-    data = JSON.parse(ev.dataTransfer?.getData("text/plain") || "");
-  } catch {
+/** Is this a drop entry for a core bonus this module handles? */
+function isCoreBonusDrop(entry) {
+  return (
+    entry?.type === "Item" &&
+    entry.document?.type === "core_bonus" &&
+    isMountCoreBonus(entry.document.system?.lid)
+  );
+}
+
+/** Locate the weapon mount index from a drop event's target element. */
+function mountIndexFromEvent(event) {
+  const el = event?.target ?? event?.originalEvent?.target ?? event?.currentTarget;
+  const node =
+    el?.closest?.(".mount-type-ctx-root, .mount.card") ??
+    (el?.nodeType === 3 ? el.parentElement?.closest?.(".mount-type-ctx-root, .mount.card") : null);
+  if (!node) return -1;
+  const path =
+    node.dataset?.path ??
+    node.querySelector?.(".mount-type-ctx-root")?.dataset?.path ??
+    node.closest?.(".mount.card")?.querySelector?.(".mount-type-ctx-root")?.dataset?.path ??
+    "";
+  const m = /weapon_mounts\.(\d+)/.exec(path);
+  return m ? Number(m[1]) : -1;
+}
+
+async function pinDroppedCoreBonus(mech, event, doc) {
+  const lid = doc.system.lid;
+  const index = mountIndexFromEvent(event);
+  const mount = index >= 0 ? mech.system?.loadout?.weapon_mounts?.[index] : null;
+
+  if (!mount || mount.bracing) {
+    ui.notifications?.warn(game.i18n.localize(`${MODULE_ID}.drop.needMount`));
     return;
   }
-  if (data?.type !== "Item" || !data.uuid) return;
-
-  let item;
-  try {
-    item = await fromUuid(data.uuid);
-  } catch {
-    return;
-  }
-  const lid = item?.system?.lid;
-  if (item?.type !== "core_bonus") return;
-
-  // It's a core bonus drop — claim the event so the sheet doesn't also handle it.
-  ev.preventDefault();
-  ev.stopPropagation();
-
-  if (!isMountCoreBonus(lid)) {
-    ui.notifications?.warn(
-      game.i18n.format(`${MODULE_ID}.drop.unsupported`, { name: item.name })
-    );
-    return;
-  }
-
-  const mount = mech.system?.loadout?.weapon_mounts?.[index];
-  if (!mount) return;
   const pins = getPins(mech, mount, index);
   if (pins.includes(lid)) {
-    ui.notifications?.info(game.i18n.format(`${MODULE_ID}.drop.already`, { name: item.name }));
+    ui.notifications?.info(game.i18n.format(`${MODULE_ID}.drop.already`, { name: doc.name }));
     return;
   }
   await setPins(mech, mount, index, [...pins, lid]);
   ui.notifications?.info(
-    game.i18n.format(`${MODULE_ID}.drop.pinned`, { name: item.name, mount: mount.type })
+    game.i18n.format(`${MODULE_ID}.drop.pinned`, { name: doc.name, mount: mount.type })
   );
   if (!pilotMountCoreBonusLids(mech).has(lid)) {
     ui.notifications?.warn(game.i18n.localize(`${MODULE_ID}.orphanWarning`));
   }
 }
+
+/**
+ * The system routes every sheet drop through `canRootDrop` (gates the dragover
+ * preventDefault, so without this a core-bonus drop is inert) and `onRootDrop`.
+ * We extend both on the mech sheet prototype.
+ */
+function installDropHook() {
+  const proto = game.lancer?.applications?.LancerMechSheet?.prototype;
+  if (!proto || proto.__lcbeDropPatched) return;
+
+  const origCan = proto.canRootDrop;
+  proto.canRootDrop = function (entry) {
+    if (isCoreBonusDrop(entry)) return true;
+    return origCan.call(this, entry);
+  };
+
+  const origOn = proto.onRootDrop;
+  proto.onRootDrop = async function (entry, event, dest) {
+    if (isCoreBonusDrop(entry)) {
+      try {
+        await pinDroppedCoreBonus(this.actor, event, entry.document);
+      } catch (err) {
+        console.error(`${MODULE_ID} | core bonus drop failed`, err);
+      }
+      return; // handled — do not let the sheet also process it
+    }
+    return origOn.call(this, entry, event, dest);
+  };
+
+  proto.__lcbeDropPatched = true;
+  console.log(`${MODULE_ID} | patched LancerMechSheet drop handling for core bonuses`);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Sheet decoration — pinned-bonus tags                                      */
+/* -------------------------------------------------------------------------- */
 
 function decorateMountCard(card, mech, editable) {
   const header = card.querySelector(".mount-type-ctx-root");
@@ -236,20 +275,14 @@ function decorateMountCard(card, mech, editable) {
   const mount = mech.system?.loadout?.weapon_mounts?.[index];
   if (!mount || mount.bracing) return;
 
-  // Drop-to-pin: register once per card element.
-  if (editable && card.dataset.lcbeDnd !== "1") {
-    card.dataset.lcbeDnd = "1";
-    card.addEventListener("dragover", ev => {
-      if (ev.dataTransfer?.types?.includes("text/plain")) {
-        ev.preventDefault();
-        card.classList.add("lcbe-drop-ok");
-      }
-    });
+  // Visual feedback only while dragging a core bonus over the card; the actual
+  // drop is handled by the patched canRootDrop / onRootDrop.
+  if (editable && card.dataset.lcbeHover !== "1") {
+    card.dataset.lcbeHover = "1";
+    const isCbDrag = () => document.body.classList.contains("dragging-core_bonus");
+    card.addEventListener("dragenter", () => { if (isCbDrag()) card.classList.add("lcbe-drop-ok"); });
     card.addEventListener("dragleave", () => card.classList.remove("lcbe-drop-ok"));
-    card.addEventListener("drop", ev => {
-      card.classList.remove("lcbe-drop-ok");
-      onCoreBonusDrop(ev, mech, index);
-    });
+    card.addEventListener("drop", () => card.classList.remove("lcbe-drop-ok"));
   }
 
   card.querySelector(".lcbe-row")?.remove(); // rebuilt each render
@@ -503,6 +536,7 @@ Hooks.once("ready", () => {
     return;
   }
   installImportHook();
+  installDropHook();
 });
 
 // Exposed for debugging / other modules.
@@ -517,4 +551,5 @@ globalThis.lancerCoreBonusEnhancements = {
   activeCoreBonusForWeapon,
   overpowerUsedThisRound,
   applyImportedPins,
+  pinDroppedCoreBonus,
 };

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1
+
+- **Fixed:** dragging a core bonus onto a mount did nothing. The DIY drop
+  listeners were being pre-empted by the system's own drop pipeline. Pinning now
+  goes through that pipeline: `LancerMechSheet.canRootDrop` / `onRootDrop` are
+  extended to accept a `core_bonus` drop and pin it to the mount under the
+  cursor. Works from the compendium, the pilot sheet, and the sidebar.
+- The mount card highlights while you drag a core bonus over it.
+
 ## 0.2.0
 
 - **Pinning is now drag-drop.** Drop a core bonus item (from a compendium, the
