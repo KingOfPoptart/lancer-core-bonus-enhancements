@@ -16,7 +16,7 @@ flag.
 | Core bonus | Behaviour |
 | --- | --- |
 | **Auto-Stabilizing Hardpoints** | Pin it to a mount. Attacks with any weapon on that mount get **+1 Accuracy**, pre-filled in the Accuracy/Difficulty dialog (still adjustable). |
-| **Overpower Caliber** | Pin + display only. The 1/round +1d6 on hit needs a damage-roll hook that does not exist yet ([system #189](https://github.com/Eranziel/foundryvtt-lancer/issues/189)). |
+| **Overpower Caliber** | Pin it to a mount. When you roll damage for a weapon on that mount **after a hit**, once per round it asks whether to add **+1d6 bonus damage**. Saying yes adds it to the damage HUD and spends the 1/round; it frees up again when the combat round advances. |
 | **Superheavy Mounting** | Pin + display only, by design — it grants an extra mount, which the mount controls already handle. |
 
 Pinning is done from the **mech sheet**: a small row appears under each weapon
@@ -41,6 +41,14 @@ but flagged and does nothing until the pilot regains it (or you detach it).
   the firing weapon, and if Auto-Stabilizing Hardpoints is pinned there and owned
   by the pilot, adds `1` to `state.data.acc_diff.base.accuracy` before the HUD
   opens.
+- **Bonus damage.** A second step
+  (`lancer-core-bonus-enhancements.overpowerDamage`) is inserted into
+  `DamageRollFlow` after `initDamageData`. If Overpower Caliber is pinned to the
+  firing weapon's mount, owned by the pilot, the roll follows a hit, and it has
+  not been used this combat round, it prompts to add `{type} 1d6` to
+  `state.data.bonus_damage` and records the use against
+  `game.combat.id` + `game.combat.round`. Out of combat there is no round, so no
+  limit is enforced.
 
 ## Install
 
@@ -75,6 +83,9 @@ lancer-core-bonus-enhancements/
 - Pins are tied to a mount's position and configuration. Reordering mounts,
   inserting a mount before a pinned one, or changing a mount's type/fittings
   clears its pin; re-pin from the sheet.
+- Overpower Caliber's "when you hit" check treats a damage roll with no target
+  as a hit (matching how the system rolls target-less damage), and its 1/round
+  lock is only enforced while an encounter is running in the Combat Tracker.
 
 ## Licence
 

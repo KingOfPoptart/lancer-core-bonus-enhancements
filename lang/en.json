@@ -1,5 +1,8 @@
 {
   "lancer-core-bonus-enhancements.addPlaceholder": "+ pin core bonus…",
   "lancer-core-bonus-enhancements.detach": "Detach core bonus from this mount",
-  "lancer-core-bonus-enhancements.orphanWarning": "The piloting pilot no longer has this core bonus. It will not apply until the pilot regains it or you detach it."
+  "lancer-core-bonus-enhancements.orphanWarning": "The piloting pilot no longer has this core bonus. It will not apply until the pilot regains it or you detach it.",
+  "lancer-core-bonus-enhancements.overpower.prompt": "Add +{dice} bonus damage from Overpower Caliber? This uses its 1/round.",
+  "lancer-core-bonus-enhancements.overpower.applied": "Overpower Caliber: +{dice} bonus damage added.",
+  "lancer-core-bonus-enhancements.overpower.alreadyUsed": "Overpower Caliber has already been used this round."
 }
