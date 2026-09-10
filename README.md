@@ -19,6 +19,39 @@ flag.
 | **Overpower Caliber** | Pin it to a mount. When you roll damage for a weapon on that mount **after a hit**, once per round it asks whether to add **+1d6 bonus damage**; saying yes adds it to the damage HUD and spends the 1/round. It frees up when the combat round advances. |
 | **Superheavy Mounting** | Pin + display only, by design — it grants an extra mount, which the mount controls already handle. |
 
+## Install
+
+Manifest URL:
+
+```
+https://github.com/KingOfPoptart/lancer-core-bonus-enhancements/releases/latest/download/module.json
+```
+
+Requires the LANCER system 3.0.0+ and Foundry v13. Built and tested against
+LANCER 3.1.3.
+
+## Screenshots
+
+Core bonuses pinned to weapon mounts on the mech sheet — Auto-Stabilizing
+Hardpoints on the Main mount, Overpower Caliber and Superheavy Mounting on the
+Heavy mount:
+
+![Core bonus tags on weapon mount cards](docs/01-mount-tags.png)
+
+**Auto-Stabilizing Hardpoints** adds its +1 Accuracy die to every attack with a
+weapon on the mount (`1d20 + grit + 1d6`):
+
+![Attack roll with the Auto-Stab accuracy die](docs/02-autostab-roll.png)
+
+**Overpower Caliber** — when you roll damage after a hit, once per round it asks
+whether to spend the +1d6:
+
+![Overpower Caliber prompt](docs/03-overpower-prompt.png)
+
+Choose "Yes" and the bonus die is added to the damage roll:
+
+![Damage roll with the Overpower Caliber bonus die](docs/04-overpower-roll.png)
+
 ## Pinning a core bonus to a mount
 
 **Drag the core bonus item onto the weapon mount** on the mech sheet — from a
@@ -59,17 +92,6 @@ the pilot has it (or you remove the pin).
   `initDamageData`: on a hit, if Overpower Caliber is pinned + owned + unused
   this round, it prompts to add `{type} 1d6` to `state.data.bonus_damage` and
   records the use against `game.combat.id` + `game.combat.round`.
-
-## Install
-
-Manifest URL:
-
-```
-https://github.com/KingOfPoptart/lancer-core-bonus-enhancements/releases/latest/download/module.json
-```
-
-Requires the LANCER system 3.0.0+ and Foundry v13. Built and tested against
-LANCER 3.1.3.
 
 ## Development
 
