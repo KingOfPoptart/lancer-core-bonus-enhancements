@@ -55,10 +55,14 @@ const isMountCoreBonus = lid => Object.prototype.hasOwnProperty.call(MOUNT_CORE_
 /* -------------------------------------------------------------------------- */
 
 /**
- * A key for a mount that is stable across most loadout edits: mount type + the
- * ordered list of its fitting sizes, plus its current index to disambiguate
- * duplicates. On read we fall back to a same-type/same-sizes match at a
- * different index (handles a mount being inserted or removed earlier in the list).
+ * A key for one mount: mount type + its ordered fitting sizes + its index.
+ *
+ * Matching is strict — no fuzzy fallback — because two identically configured
+ * mounts (e.g. two Main mounts) would otherwise be indistinguishable and a pin
+ * on one would leak onto the other. The trade-off: reordering or inserting a
+ * mount ahead of a pinned one drops the pin, and it must be re-pinned. Changing
+ * a mount's type or fittings also drops its pins, which is intended (the bonus
+ * was chosen for that mount as it was configured).
  */
 function mountSignature(mount, index) {
   const sizes = (mount?.slots ?? []).map(s => s?.size ?? "?").join(",");
@@ -69,34 +73,18 @@ function readAllPins(mech) {
   return foundry.utils.deepClone(mech.getFlag(MODULE_ID, "mounts") ?? {});
 }
 
-/** LIDs pinned to one mount, with the single-near-match fallback described above. */
+/** LIDs pinned to exactly this mount (strict signature match). */
 function getPins(mech, mount, index) {
-  const all = readAllPins(mech);
-  const sig = mountSignature(mount, index);
-  if (Array.isArray(all[sig])) return all[sig];
-
-  const prefix = sig.slice(0, sig.lastIndexOf("|") + 1);
-  const near = Object.keys(all).filter(k => k !== sig && k.startsWith(prefix));
-  if (near.length === 1 && Array.isArray(all[near[0]])) return all[near[0]];
-  return [];
+  const entry = readAllPins(mech)[mountSignature(mount, index)];
+  return Array.isArray(entry) ? entry : [];
 }
 
 async function setPins(mech, mount, index, lids) {
   const all = readAllPins(mech);
   const sig = mountSignature(mount, index);
-
-  // If we had been reading via the single-near-match fallback, move that entry
-  // onto the real signature rather than orphaning it.
-  if (!Array.isArray(all[sig])) {
-    const prefix = sig.slice(0, sig.lastIndexOf("|") + 1);
-    const near = Object.keys(all).filter(k => k !== sig && k.startsWith(prefix));
-    if (near.length === 1) delete all[near[0]];
-  }
-
   const clean = [...new Set(lids.filter(isMountCoreBonus))];
   if (clean.length) all[sig] = clean;
   else delete all[sig];
-
   await mech.setFlag(MODULE_ID, "mounts", all);
 }
 

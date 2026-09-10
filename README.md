@@ -28,9 +28,10 @@ but flagged and does nothing until the pilot regains it (or you detach it).
 ## How it works
 
 - **Storage.** Pins live in `mech.flags["lancer-core-bonus-enhancements"].mounts`,
-  keyed by a mount *signature* (`type | fitting sizes | index`). The signature
-  survives reordering and most edits; a same-type/same-sizes match at a new index
-  is reconciled on read.
+  keyed by a mount signature (`type | fitting sizes | index`), matched strictly.
+  Changing a mount's type or fittings drops its pins (intended); reordering or
+  inserting a mount ahead of a pinned one also drops the pin and it must be
+  re-pinned (see limitations).
 - **Sheet.** `renderLancerMechSheet` → a `.lcbe-row` is injected under each
   `.mount-type-ctx-root` header. The mount index is read from the header's
   `data-path`.
@@ -71,8 +72,9 @@ lancer-core-bonus-enhancements/
 
 - Comp/Con stores core bonuses attached to mounts, but the LANCER importer
   discards that field — re-pin after importing a mech.
-- If you have two identically configured mounts and delete one, the surviving
-  mount may lose its pin. Signature reconciliation for that case is planned.
+- Pins are tied to a mount's position and configuration. Reordering mounts,
+  inserting a mount before a pinned one, or changing a mount's type/fittings
+  clears its pin; re-pin from the sheet.
 
 ## Licence
 
