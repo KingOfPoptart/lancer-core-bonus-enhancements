@@ -1,0 +1,50 @@
+# Publishes a release when a v* tag is pushed.
+# Builds module.zip (with module.json at the archive root, as Foundry requires),
+# rewrites the manifest's version / download URLs to the tag, and attaches both
+# module.json and module.zip to the GitHub Release.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive version from tag
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Patch module.json
+        uses: microsoft/variable-substitution@v1
+        with:
+          files: module.json
+        env:
+          version: ${{ steps.ver.outputs.version }}
+          manifest: https://github.com/${{ github.repository }}/releases/latest/download/module.json
+          download: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/module.zip
+
+      - name: Build module.zip
+        run: |
+          zip -r module.zip \
+            module.json \
+            scripts/ styles/ lang/ \
+            README.md CHANGELOG.md LICENSE
+
+      - name: Create / update the Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: |
+            module.json
+            module.zip
