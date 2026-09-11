@@ -5,8 +5,19 @@
   "lancer-core-bonus-enhancements.drop.already": "{name} is already pinned to that mount.",
   "lancer-core-bonus-enhancements.drop.unsupported": "{name} is not a mount core bonus this module automates.",
   "lancer-core-bonus-enhancements.drop.needMount": "Drop the core bonus onto a weapon mount on the LOADOUT tab.",
-  "lancer-core-bonus-enhancements.import.restored": "Lancer Core Bonus Enhancements: restored {count} pinned core bonus(es) from the import.",
+  "lancer-core-bonus-enhancements.import.restored": "Lancer Core Bonus Enhancements: restored {count} core bonus setup(s) from the import.",
   "lancer-core-bonus-enhancements.overpower.prompt": "Add +{dice} bonus damage from Overpower Caliber? This uses its 1/round.",
   "lancer-core-bonus-enhancements.overpower.applied": "Overpower Caliber: +{dice} bonus damage added.",
-  "lancer-core-bonus-enhancements.overpower.alreadyUsed": "Overpower Caliber has already been used this round."
+  "lancer-core-bonus-enhancements.overpower.alreadyUsed": "Overpower Caliber has already been used this round.",
+  "lancer-core-bonus-enhancements.superheavy.added": "Superheavy Mounting: added a superheavy weapon mount.",
+  "lancer-core-bonus-enhancements.superheavy.removed": "Superheavy Mounting: removed the superheavy weapon mount.",
+  "lancer-core-bonus-enhancements.superheavy.already": "This mech already has its Superheavy Mounting mount.",
+  "lancer-core-bonus-enhancements.superheavy.tooManyMounts": "Superheavy Mounting only grants an extra mount to a mech with fewer than 3 mounts (excluding integrated). This mech has {count}.",
+  "lancer-core-bonus-enhancements.superheavy.onlySuperheavy": "The Superheavy Mounting mount only takes superheavy weapons — {name} was removed from it.",
+  "lancer-core-bonus-enhancements.superheavy.removeTitle": "Remove Superheavy Mounting — deletes this superheavy mount",
+  "lancer-core-bonus-enhancements.superheavy.confirmRemoveWithWeapon": "This superheavy mount still holds a weapon. Remove the mount anyway? The weapon stays on the mech, unmounted.",
+  "lancer-core-bonus-enhancements.superheavy.braceHeavy": "The Heavy mount must be the one set as Bracing for this superheavy weapon.",
+  "lancer-core-bonus-enhancements.superheavy.braced": "Superheavy Mounting: braced the {type} mount for the superheavy weapon.",
+  "lancer-core-bonus-enhancements.superheavy.unbraced": "Superheavy Mounting: released the braced {type} mount.",
+  "lancer-core-bonus-enhancements.superheavy.noBraceMount": "Superheavy Mounting: {name} still needs another mount set as Bracing, but this mech has no free mount to use. Add a weapon mount (a Heavy mount, ideally) for it."
 }

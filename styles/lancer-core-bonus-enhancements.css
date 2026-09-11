@@ -59,3 +59,13 @@
   outline: 2px dashed var(--color-shadow-primary, #ff6400);
   outline-offset: -2px;
 }
+
+/* RAW rules warning under the Superheavy Mounting tag */
+.lcbe-warn {
+  padding: 3px 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: #fff;
+  background: #b03a2e;
+}

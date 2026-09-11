@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.0.0
+
+First stable release. All three core bonuses are automated and verified in-world.
+Changes since 0.2.2:
+
+- **Superheavy Mounting now adds a mount instead of tagging a weapon**, following
+  the rule closely:
+  - Dropping it anywhere on the mech sheet adds a `Superheavy`-type weapon mount —
+    but only when the mech has fewer than 3 non-integrated mounts.
+  - The mount is **superheavy-only**: a `preUpdateActor` hook strips any smaller
+    weapon before it can be saved into the slot.
+  - The added mount carries a "Superheavy Mounting" tag; removing the tag deletes
+    the mount (with a confirm if a weapon is still in it — the weapon then stays
+    on the mech, unmounted).
+  - **Auto-bracing.** When a superheavy weapon is dropped into the mount, another
+    mount is consumed as Bracing automatically — the Heavy mount if the mech has
+    one (RAW: the superheavy weapon *must* use that mount), otherwise the last
+    other weapon mount. The braced mount keeps its type, so its card still reads
+    e.g. "Heavy Weapon Mount / LOCKED: BRACING". Whatever was on it is remembered
+    and put back when the superheavy weapon leaves or the Superheavy Mounting
+    mount is removed.
+  - If you've manually braced some *other* mount while a free Heavy mount exists,
+    the card still flags that the Heavy mount is the one that should be used.
+  - **No mount to brace with.** If the superheavy weapon goes into the mount and
+    there's no free mount left to consume as Bracing, it fails gracefully: a
+    single warning toast tells you to add one (the system also flags "needs
+    bracing"). The notice clears itself once you add a mount or remove the
+    weapon.
+  - Import: adopts an imported superheavy mount, or adds one for a mech whose
+    Comp/Con superheavy slot held a weapon.
+  - Tracked by a separate `superheavy` flag.
+- **Drag-drop toasts no longer fire twice.** A single drop could reach both the
+  native drop listener and the system's `onRootDrop`; the second is now
+  swallowed within a short window.
+- Auto-Stabilizing Hardpoints and Overpower Caliber are unchanged.
+
 ## 0.2.2
 
 - **Fixed:** dragging a core bonus **from a compendium** still did nothing.
