@@ -1,5 +1,11 @@
 # Lancer Core Bonus Enhancements
 
+![Foundry v13](https://img.shields.io/badge/Foundry-v13-informational)
+![System: LANCER](https://img.shields.io/badge/system-lancer-orange)
+![Latest release](https://img.shields.io/github/v/release/KingOfPoptart/lancer-core-bonus-enhancements?sort=semver)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
+[![On the Foundry package listing](https://img.shields.io/badge/Foundry-package%20listing-fe6a00)](https://foundryvtt.com/packages/lancer-core-bonus-enhancements)
+
 A [Foundry VTT](https://foundryvtt.com/) module for the
 [LANCER](https://foundryvtt.com/packages/lancer) system that adds mechanical
 support for the mount- and weapon-scoped core bonuses the system leaves to manual
@@ -11,6 +17,10 @@ world migration. It uses LANCER's documented extension points
 (`lancer.registerFlows`, the sheet render hook) and stores its data in an actor
 flag.
 
+> **Now on Foundry's official package repository:**
+> **[foundryvtt.com/packages/lancer-core-bonus-enhancements](https://foundryvtt.com/packages/lancer-core-bonus-enhancements)**
+> — install and update it straight from inside Foundry.
+
 ## What it does
 
 | Core bonus | Behaviour |
@@ -19,13 +29,19 @@ flag.
 | **Overpower Caliber** | Pin it to a mount. When you roll damage for a weapon on that mount **after a hit**, once per round it asks whether to add **+1d6 bonus damage**; saying yes adds it to the damage HUD and spends the 1/round. It frees up when the combat round advances. |
 | **Superheavy Mounting** | Drop it on the mech (anywhere on the sheet) and it **adds a superheavy weapon mount** — but only if the mech has fewer than 3 non-integrated mounts, per the rule. The mount takes *only* superheavy weapons (anything smaller is bounced back out), carries a tag, and removing the tag deletes the mount. Put a superheavy weapon in it and another mount (the Heavy mount, per RAW) is **automatically consumed as Bracing** — and released, with its weapon put back, when the superheavy weapon leaves. |
 
-## Install
+## Installation
 
-Manifest URL:
+**From inside Foundry (recommended):** open **Add-on Modules → Install Module**, find
+**Lancer Core Bonus Enhancements** in the list, and click **Install**. New releases then show up
+under the module's **Update** button (or **Update All**).
+
+Prefer a manifest URL? Paste this into the **Manifest URL** box at the bottom of that window instead:
 
 ```
 https://github.com/KingOfPoptart/lancer-core-bonus-enhancements/releases/latest/download/module.json
 ```
+
+Then enable **Lancer Core Bonus Enhancements** in your world.
 
 Requires the LANCER system 3.0.0+ and Foundry v13. Built and tested against
 LANCER 3.1.3.
